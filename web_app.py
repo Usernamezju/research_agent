@@ -66,5 +66,6 @@ def research():
 if __name__ == "__main__":
     import sys
     sys.stdout.reconfigure(encoding="utf-8")
-    print("Research Agent Web started - http://127.0.0.1:5000")
-    app.run(debug=False, threaded=True, host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    print(f"Research Agent Web started on port {port}")
+    app.run(debug=False, threaded=True, host="0.0.0.0", port=port)

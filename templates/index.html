@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 行业调研 Agent</title>
+  <style>
+    /* ── 全局 ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface2:  #22263a;
+      --border:    #2e3350;
+      --accent:    #6c63ff;
+      --accent2:   #00d4aa;
+      --warn:      #f5a623;
+      --danger:    #ff5c5c;
+      --text:      #e2e8f0;
+      --muted:     #8892a4;
+      --radius:    12px;
+    }
+
+    body {
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 60px;
+    }
+
+    /* ── 顶部标题 ─────────────────────────────────────────── */
+    header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header p {
+      color: var(--muted);
+      margin-top: 8px;
+      font-size: 0.95rem;
+    }
+
+    /* ── 卡片容器 ─────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      width: 100%;
+      max-width: 860px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* ── 输入区域 ─────────────────────────────────────────── */
+    .input-row {
+      display: flex;
+      gap: 12px;
+    }
+    #topic-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      padding: 12px 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #topic-input:focus { border-color: var(--accent); }
+    #topic-input::placeholder { color: var(--muted); }
+
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.18s;
+      user-select: none;
+    }
+    .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── 按钮 ─────────────────────────────────────────────── */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 12px 28px;
+      transition: all 0.18s;
+    }
+    #start-btn {
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      color: #fff;
+      min-width: 120px;
+    }
+    #start-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+    #start-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    #stop-btn {
+      background: var(--surface2);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 8px 18px;
+      font-size: 0.85rem;
+      display: none;
+    }
+    #stop-btn:hover { background: var(--danger); color: #fff; }
+
+    /* ── 状态栏 ─────────────────────────────────────────────*/
+    #status-bar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      padding: 10px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      width: 100%;
+      max-width: 860px;
+    }
+    .pulse {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--accent2);
+      animation: pulse 1.2s infinite;
+      flex-shrink: 0;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.75); }
+    }
+    #status-text { color: var(--text); flex: 1; }
+
+    /* ── 进度步骤 ─────────────────────────────────────────── */
+    .step-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 320px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .step-list::-webkit-scrollbar { width: 4px; }
+    .step-list::-webkit-scrollbar-track { background: transparent; }
+    .step-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .step {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--surface2);
+      border-left: 3px solid transparent;
+      animation: fadeIn 0.25s ease;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+    .step.thinking  { border-left-color: var(--accent); }
+    .step.tool_call { border-left-color: var(--warn); }
+    .step.tool_ok   { border-left-color: var(--accent2); }
+    .step.tool_err  { border-left-color: var(--danger); }
+    .step.error     { border-left-color: var(--danger); background: #2a1a1a; }
+
+    .step-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+    .step-body { flex: 1; word-break: break-word; }
+    .step-body strong { color: var(--warn); }
+    .step-body .result-preview {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-top: 4px;
+      white-space: pre-wrap;
+    }
+
+    /* ── 工具调用徽章 ─────────────────────────────────────── */
+    .tool-badge {
+      display: inline-block;
+      background: rgba(245,166,35,0.15);
+      border: 1px solid rgba(245,166,35,0.4);
+      color: var(--warn);
+      border-radius: 4px;
+      padding: 1px 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-right: 6px;
+    }
+    .param-row { color: var(--muted); font-size: 0.82rem; margin-top: 3px; }
+    .param-key { color: var(--accent2); }
+
+    /* ── 最终报告 ─────────────────────────────────────────── */
+    #report-section { display: none; }
+    #report-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    #copy-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      border-radius: 6px;
+    }
+    #copy-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    #report-content {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      line-height: 1.8;
+      font-size: 0.92rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 520px;
+      overflow-y: auto;
+    }
+    #report-content::-webkit-scrollbar { width: 4px; }
+    #report-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* Markdown 简单渲染 */
+    #report-content h1 { font-size: 1.4rem; color: var(--accent2); margin: 16px 0 8px; }
+    #report-content h2 { font-size: 1.15rem; color: var(--accent); margin: 14px 0 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+    #report-content h3 { font-size: 1rem; color: var(--text); margin: 10px 0 4px; }
+    #report-content li { margin-left: 20px; }
+    #report-content a  { color: var(--accent2); text-decoration: none; }
+    #report-content a:hover { text-decoration: underline; }
+    #report-content code {
+      background: rgba(108,99,255,0.15);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.87em;
+    }
+
+    /* ── 空状态 ───────────────────────────────────────────── */
+    #empty-hint {
+      text-align: center;
+      color: var(--muted);
+      padding: 40px 20px;
+      font-size: 0.9rem;
+    }
+    #empty-hint .big { font-size: 2.5rem; margin-bottom: 12px; }
+
+    /* ── 统计行 ───────────────────────────────────────────── */
+    #stats-row {
+      display: none;
+      gap: 20px;
+      justify-content: center;
+      width: 100%;
+      max-width: 860px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 20px;
+      text-align: center;
+    }
+    .stat-card .num { font-size: 1.6rem; font-weight: 700; color: var(--accent2); }
+    .stat-card .label { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🔍 AI 行业调研 Agent</h1>
+    <p>输入调研主题，Agent 自动搜索、阅读、整合，生成结构化报告并写入 Notion</p>
+  </header>
+
+  <!-- 输入卡片 -->
+  <div class="card">
+    <div class="card-title">调研主题</div>
+    <div class="input-row">
+      <input id="topic-input" type="text" placeholder="例如：高校AI烹饪设备市场、新能源汽车电池技术…" />
+      <button id="start-btn" onclick="startResearch()">开始调研</button>
+      <button id="stop-btn" onclick="stopResearch()">停止</button>
+    </div>
+    <div class="suggestions">
+      <span class="chip" onclick="setTopic(this)">高校AI烹饪设备市场</span>
+      <span class="chip" onclick="setTopic(this)">新能源汽车电池市场</span>
+      <span class="chip" onclick="setTopic(this)">AI医疗影像行业</span>
+      <span class="chip" onclick="setTopic(this)">低空经济与无人机</span>
+      <span class="chip" onclick="setTopic(this)">大模型企业应用</span>
+    </div>
+  </div>
+
+  <!-- 状态栏 -->
+  <div id="status-bar">
+    <div class="pulse"></div>
+    <span id="status-text">正在初始化…</span>
+    <span id="elapsed-time" style="color:var(--muted);font-size:0.82rem"></span>
+  </div>
+
+  <!-- 统计行 -->
+  <div id="stats-row">
+    <div class="stat-card"><div class="num" id="stat-search">0</div><div class="label">搜索次数</div></div>
+    <div class="stat-card"><div class="num" id="stat-fetch">0</div><div class="label">页面抓取</div></div>
+    <div class="stat-card"><div class="num" id="stat-steps">0</div><div class="label">推理步骤</div></div>
+  </div>
+
+  <!-- 进度卡片 -->
+  <div class="card" id="progress-card" style="display:none">
+    <div class="card-title">实时进度</div>
+    <div class="step-list" id="step-list">
+      <div id="empty-hint">
+        <div class="big">🤖</div>
+        等待 Agent 启动…
+      </div>
+    </div>
+  </div>
+
+  <!-- 报告卡片 -->
+  <div class="card" id="report-section">
+    <div id="report-header">
+      <div class="card-title" style="margin-bottom:0">📄 调研报告</div>
+      <button id="copy-btn" onclick="copyReport()">复制报告</button>
+    </div>
+    <div id="report-content"></div>
+  </div>
+
+  <script>
+    let evtSource = null;
+    let startTime = null;
+    let timerInterval = null;
+    let stats = { search: 0, fetch: 0, steps: 0 };
+    let reportText = "";
+
+    /* ── 辅助 ─────────────────────────────────────────────── */
+    function setTopic(el) {
+      document.getElementById("topic-input").value = el.textContent;
+      document.getElementById("topic-input").focus();
+    }
+
+    function updateElapsed() {
+      if (!startTime) return;
+      const sec = Math.floor((Date.now() - startTime) / 1000);
+      const m = Math.floor(sec / 60), s = sec % 60;
+      document.getElementById("elapsed-time").textContent =
+        `${m > 0 ? m + "m " : ""}${s}s`;
+    }
+
+    function addStep(cls, icon, html) {
+      const list = document.getElementById("step-list");
+      const hint = document.getElementById("empty-hint");
+      if (hint) hint.remove();
+
+      const div = document.createElement("div");
+      div.className = `step ${cls}`;
+      div.innerHTML = `<span class="step-icon">${icon}</span><div class="step-body">${html}</div>`;
+      list.appendChild(div);
+      list.scrollTop = list.scrollHeight;
+      stats.steps++;
+      document.getElementById("stat-steps").textContent = stats.steps;
+    }
+
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    /* ── 渲染 Markdown（简易版）─────────────────────────── */
+    function renderMarkdown(md) {
+      const lines = md.split("\n");
+      let html = "";
+      for (const line of lines) {
+        if (line.startsWith("# "))       html += `<h1>${escHtml(line.slice(2))}</h1>`;
+        else if (line.startsWith("## ")) html += `<h2>${escHtml(line.slice(3))}</h2>`;
+        else if (line.startsWith("### "))html += `<h3>${escHtml(line.slice(4))}</h3>`;
+        else if (line.startsWith("- ") || line.startsWith("* "))
+          html += `<li>${renderInline(line.slice(2))}</li>`;
+        else if (line.trim() === "")     html += `<br>`;
+        else                              html += `<p>${renderInline(line)}</p>`;
+      }
+      return html;
+    }
+
+    function renderInline(s) {
+      return escHtml(s)
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/`(.+?)`/g,       "<code>$1</code>")
+        .replace(/(https?:\/\/[^\s<>]+)/g, '<a href="$1" target="_blank">$1</a>');
+    }
+
+    /* ── 开始调研 ─────────────────────────────────────────── */
+    function startResearch() {
+      const topic = document.getElementById("topic-input").value.trim();
+      if (!topic) {
+        document.getElementById("topic-input").focus();
+        return;
+      }
+
+      // 重置 UI
+      stats = { search: 0, fetch: 0, steps: 0 };
+      ["stat-search","stat-fetch","stat-steps"].forEach(id =>
+        document.getElementById(id).textContent = "0");
+      document.getElementById("step-list").innerHTML =
+        `<div id="empty-hint"><div class="big">🤖</div>正在启动 Agent…</div>`;
+      document.getElementById("report-section").style.display = "none";
+      document.getElementById("report-content").innerHTML = "";
+      reportText = "";
+
+      document.getElementById("start-btn").disabled = true;
+      document.getElementById("stop-btn").style.display = "inline-block";
+      document.getElementById("status-bar").style.display = "flex";
+      document.getElementById("stats-row").style.display = "flex";
+      document.getElementById("progress-card").style.display = "block";
+      document.getElementById("status-text").textContent = `正在调研：${topic}`;
+
+      startTime = Date.now();
+      timerInterval = setInterval(updateElapsed, 1000);
+
+      // SSE 请求
+      fetch(new URL("/research", window.location.href).toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic })
+      }).then(res => {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+
+        function pump() {
+          reader.read().then(({ done, value }) => {
+            if (done) { onStreamEnd(); return; }
+            buf += decoder.decode(value, { stream: true });
+            const parts = buf.split("\n\n");
+            buf = parts.pop();
+            for (const part of parts) {
+              if (part.startsWith("data: ")) {
+                try { handleEvent(JSON.parse(part.slice(6))); }
+                catch(e) { console.warn("parse error", e); }
+              }
+            }
+            pump();
+          }).catch(e => { console.error(e); onStreamEnd(); });
+        }
+        pump();
+      }).catch(e => {
+        addStep("error", "❌", `网络错误: ${escHtml(String(e))}`);
+        onStreamEnd();
+      });
+    }
+
+    /* ── 处理 SSE 事件 ────────────────────────────────────── */
+    function handleEvent(evt) {
+      const { type, data } = evt;
+
+      if (type === "thinking") {
+        const text = String(data).trim();
+        if (text) addStep("thinking", "💭", escHtml(text.slice(0, 300)));
+      }
+
+      else if (type === "tool_call") {
+        const name = data.name;
+        const inp  = data.input || {};
+
+        if (name === "tavily_search") {
+          stats.search++;
+          document.getElementById("stat-search").textContent = stats.search;
+          addStep("tool_call", "🔍",
+            `<span class="tool-badge">tavily_search</span> <strong>${escHtml(inp.query || "")}</strong>` +
+            (inp.max_results ? `<div class="param-row"><span class="param-key">max_results</span>: ${inp.max_results}</div>` : "")
+          );
+        } else if (name === "jina_fetch") {
+          stats.fetch++;
+          document.getElementById("stat-fetch").textContent = stats.fetch;
+          const url = inp.url || "";
+          addStep("tool_call", "📄",
+            `<span class="tool-badge">jina_fetch</span>` +
+            `<div class="param-row"><span class="param-key">url</span>: <a href="${escHtml(url)}" target="_blank">${escHtml(url.slice(0,80))}${url.length>80?"…":""}</a></div>`
+          );
+        } else if (name === "notion_write") {
+          addStep("tool_call", "📝",
+            `<span class="tool-badge">notion_write</span> <strong>${escHtml(inp.title || "")}</strong>` +
+            `<div class="param-row">正在写入 Notion 并保存 report.md…</div>`
+          );
+        } else {
+          addStep("tool_call", "🔧",
+            `<span class="tool-badge">${escHtml(name)}</span> ` +
+            escHtml(JSON.stringify(inp).slice(0, 120))
+          );
+        }
+      }
+
+      else if (type === "tool_result") {
+        const ok = data.success;
+        const preview = String(data.result || "").slice(0, 200).replace(/\n/g, " ");
+        addStep(
+          ok ? "tool_ok" : "tool_err",
+          ok ? "✅" : "❌",
+          `<strong>${escHtml(data.name)}</strong> 执行${ok ? "成功" : "失败"}` +
+          `<div class="result-preview">${escHtml(preview)}${data.result?.length > 200 ? "…" : ""}</div>`
+        );
+      }
+
+      else if (type === "done") {
+        reportText = String(data);
+        document.getElementById("report-content").innerHTML = renderMarkdown(reportText);
+        document.getElementById("report-section").style.display = "block";
+        document.getElementById("report-section").scrollIntoView({ behavior: "smooth" });
+        document.getElementById("status-text").textContent = "✅ 调研完成！";
+        document.querySelector("#status-bar .pulse").style.animation = "none";
+        document.querySelector("#status-bar .pulse").style.background = "var(--accent2)";
+        onStreamEnd();
+      }
+
+      else if (type === "error") {
+        addStep("error", "❌", `错误: ${escHtml(String(data))}`);
+      }
+
+      else if (type === "end") {
+        onStreamEnd();
+      }
+    }
+
+    /* ── 流结束 ───────────────────────────────────────────── */
+    function onStreamEnd() {
+      clearInterval(timerInterval);
+      document.getElementById("start-btn").disabled = false;
+      document.getElementById("stop-btn").style.display = "none";
+    }
+
+    function stopResearch() {
+      if (evtSource) { evtSource.close(); evtSource = null; }
+      onStreamEnd();
+      addStep("error", "🛑", "已手动停止调研");
+      document.getElementById("status-text").textContent = "已停止";
+    }
+
+    /* ── 复制报告 ─────────────────────────────────────────── */
+    function copyReport() {
+      navigator.clipboard.writeText(reportText).then(() => {
+        const btn = document.getElementById("copy-btn");
+        btn.textContent = "已复制 ✓";
+        setTimeout(() => btn.textContent = "复制报告", 2000);
+      });
+    }
+
+    /* ── 回车快捷键 ───────────────────────────────────────── */
+    document.getElementById("topic-input").addEventListener("keydown", e => {
+      if (e.key === "Enter") startResearch();
+    });
+  </script>
+</body>
+</html>
